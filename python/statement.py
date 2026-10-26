@@ -44,9 +44,26 @@ class ComedyCalculator(PerformanceCalculator):
         return super().volume_credits + math.floor(self.audience / 5)
 
 
+# new play type: historical
+class HistoricalCalculator(PerformanceCalculator):
+    # 50000, plus 1500 for each seat beyond 20
+    @property
+    def amount(self):
+        amount = 50000
+        if self.audience > 20:
+            amount += 1500 * (self.audience - 20)
+        return amount
+
+    @property
+    def volume_credits(self):
+        # one credit per five seats, this replaces the base over thirty credits
+        # since 35 seats must give 7 credits, not 12
+        return self.audience // 5
+
 CALCULATORS = {
     "tragedy": TragedyCalculator,
     "comedy": ComedyCalculator,
+    "historical": HistoricalCalculator,
 }
 
 
@@ -94,13 +111,6 @@ def statement(invoice: dict, plays: dict) -> str:
     result = f'Statement for {invoice["customer"]}\n'
     for perf in invoice['performances']:
         result += f' {play_for(perf)["name"]}: {format_as_dollars(calculator_for(perf).amount / 100)} ({perf["audience"]} seats)\n'
-    result += f'Amount owed is {format_as_dollars(total_amount() / 100)}\n'
-    result += f'You earned {total_volume_credits()} credits\n'
-    return result
-    # return the statement string
-    result = f'Statement for {invoice["customer"]}\n'
-    for perf in invoice['performances']:
-        result += f' {play_for(perf)["name"]}: {format_as_dollars(amount_for(perf) / 100)} ({perf["audience"]} seats)\n'
     result += f'Amount owed is {format_as_dollars(total_amount() / 100)}\n'
     result += f'You earned {total_volume_credits()} credits\n'
     return result
