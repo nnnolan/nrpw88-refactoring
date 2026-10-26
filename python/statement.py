@@ -4,34 +4,57 @@ import math
 # the amount and volume credits for a performance
 
 class PerformanceCalculator:
+    """Base rules shared by all play types. Amounts are in cents."""
+
     def __init__(self, play, audience):
         self.play = play
         self.audience = audience
 
     @property
     def amount(self):
-        # tragedy is 40000 for the first 30 seats, then 1000 for each additional seat
-        if self.play['type'] == "tragedy":
-            amount = 40000
-            if self.audience > 30:
-                amount += 1000 * (self.audience - 30)
-        # comedy is 30000, plus 10000 and 500 per seat beyond 20, plus 300 per seat
-        elif self.play['type'] == "comedy":
-            amount = 30000
-            if self.audience > 20:
-                amount += 10000 + 500 * (self.audience - 20)
-            amount += 300 * self.audience
-        else:
-            raise ValueError(f'unknown type: {self.play["type"]}')
-        return amount
+        raise NotImplementedError
 
     @property
     def volume_credits(self):
-        credits = max(self.audience - 30, 0)
+        return max(self.audience - 30, 0)
+
+
+class TragedyCalculator(PerformanceCalculator):
+    # 40000 for the first 30 seats, then 1000 for each additional seat
+    @property
+    def amount(self):
+        amount = 40000
+        if self.audience > 30:
+            amount += 1000 * (self.audience - 30)
+        return amount
+
+
+class ComedyCalculator(PerformanceCalculator):
+    # 30000, plus 10000 and 500 per seat beyond 20, plus 300 per seat
+    @property
+    def amount(self):
+        amount = 30000
+        if self.audience > 20:
+            amount += 10000 + 500 * (self.audience - 20)
+        return amount + 300 * self.audience
+
+    @property
+    def volume_credits(self):
         # extra credit for every five comedy attendees
-        if self.play['type'] == "comedy":
-            credits += math.floor(self.audience / 5)
-        return credits
+        return super().volume_credits + math.floor(self.audience / 5)
+
+
+CALCULATORS = {
+    "tragedy": TragedyCalculator,
+    "comedy": ComedyCalculator,
+}
+
+
+def create_calculator(play, audience):
+    try:
+        return CALCULATORS[play['type']](play, audience)
+    except KeyError:
+        raise ValueError(f'unknown type: {play["type"]}') from None
 
 def statement(invoice: dict, plays: dict) -> str:
     """
@@ -61,8 +84,7 @@ def statement(invoice: dict, plays: dict) -> str:
 
     # using the above class
     def calculator_for(performance):
-        return PerformanceCalculator(play_for(performance), performance['audience'])
-
+        return create_calculator(play_for(performance), performance['audience'])
     def total_amount():
         return sum(calculator_for(perf).amount for perf in invoice['performances'])
 
